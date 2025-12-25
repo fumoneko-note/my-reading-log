@@ -8,9 +8,6 @@ import time
 from streamlit_gsheets import GSheetsConnection
 
 # --- 設定 ---
-# 今回からデータは Google Sheets から取得します
-# secrets.toml に [connections.gsheets] の設定が必要です
-
 CATEGORY_LIST = ["小説", "AI", "Stoicism", "語学", "ノンフィクション", "エッセイ", "その他"]
 LANGUAGE_LIST = ["日本語", "英語", "スペイン語"]
 STATUS_LIST = ["読了", "読書中", "読みたい", "断念"]
@@ -46,9 +43,31 @@ if 'active_detail_index' not in st.session_state:
 if 'filter_reset_key' not in st.session_state:
     st.session_state.filter_reset_key = 0
 
+# --- デザイン（スマホ対応CSS） ---
 st.markdown("""
     <style>
     .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+    
+    /* スマホ（画面幅600px以下）の時の2列表示設定 */
+    @media (max-width: 600px) {
+        div[data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+        }
+        div[data-testid="column"] {
+            width: calc(50% - 5px) !important;
+            flex: 1 1 calc(50% - 5px) !important;
+            min-width: 140px !important;
+        }
+        .book-card {
+            height: 220px !important; /* スマホではカードを少し低く */
+        }
+        .book-image-container {
+            height: 140px !important; /* 画像エリアも縮小 */
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -57,7 +76,7 @@ st.title("📚 読書記録")
 # --- Google Sheets 接続 ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    df_books = conn.read(ttl=0) # キャッシュなしで最新を読み込み
+    df_books = conn.read(ttl=0) 
 except Exception as e:
     st.error(f"スプレッドシートへの接続に失敗しました: {e}")
     st.stop()
@@ -109,7 +128,7 @@ def update_gsheet(df_all):
         conn.update(worksheet="Sheet1", data=df_all)
         return True
     except Exception as e:
-        st.error(f"書き込みエラー: {e}\n\n※書き込みには『サービスアカウント』の設定が必要です。")
+        st.error(f"書き込みエラー: {e}")
         return False
 
 @st.dialog("📖 本の詳細", width="large")
@@ -134,7 +153,8 @@ def show_detail_dialog(row, index):
         st.write(f"📅 **読書期間:** {row['開始日']} 〜 {row['読了日']}")
         
         try:
-            r_val = int(float(row['評価'])) if str(row['評価']) != 'nan' else 0
+            r_box = str(int(float(row['評価']))) if str(row['評価']) != 'nan' else "0"
+            r_val = int(r_box)
             st.subheader('★' * r_val if r_val > 0 else '評価なし')
         except: st.subheader('評価なし')
         
@@ -187,8 +207,8 @@ if book_data:
     st.divider()
     try:
         def_rating = str(int(float(edit_data["評価"]))) if is_edit and str(edit_data["評価"]) != 'nan' else "3"
-    except:
-        def_rating = "3"
+    except: def_rating = "3"
+    
     def_cat = edit_data["カテゴリ"] if is_edit else "小説"
     def_lang = edit_data["言語"] if is_edit and "言語" in edit_data else "日本語"
     def_status = edit_data["ステータス"] if is_edit and "ステータス" in edit_data else "読了"
@@ -272,6 +292,8 @@ if not df_books.empty:
 
     # --- 本棚グリッド ---
     st.subheader(f"📖 私の本棚 ({len(df_f)} 冊)")
+    
+    # グリッドの描画
     cols = st.columns(5)
     for i, (idx, row) in enumerate(df_f.iterrows()):
         with cols[i % 5]:
@@ -281,8 +303,8 @@ if not df_books.empty:
             img_disp = f'<img src="{r_img}" style="max-height: 100%; max-width: 100%; object-fit: contain;">' if isinstance(r_img, str) and r_img.strip() != "" and str(r_img) != "nan" else '<div style="color:#ccc; font-size:0.8em;">No Image</div>'
 
             st.markdown(f"""
-            <div style="background-color: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; height: 260px; margin-bottom: 5px;">
-                <div style="height: 180px; width: 100%; border-radius: 4px; margin-bottom: 8px; overflow: hidden; background-color: white; display: flex; align-items: center; justify-content: center; position: relative;">
+            <div class="book-card" style="background-color: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; height: 260px; margin-bottom: 5px;">
+                <div class="book-image-container" style="height: 180px; width: 100%; border-radius: 4px; margin-bottom: 8px; overflow: hidden; background-color: white; display: flex; align-items: center; justify-content: center; position: relative;">
                     {img_disp}
                     <div style="position: absolute; top: 5px; right: 5px; background-color: {s_color}; width: 10px; height: 10px; border-radius: 50%; border: 1px solid white;"></div>
                 </div>
