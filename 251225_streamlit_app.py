@@ -197,17 +197,24 @@ def get_search_results(query):
     api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}"
     results = []
     try:
-        res = requests.get(api_url, timeout=5).json()
+        # User-Agentを追加して拒否されにくくする
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(api_url, headers=headers, timeout=10).json()
         if "items" in res:
             for item in res["items"][:5]: # 上位5件
                 v = item.get("volumeInfo", {})
-                img = v.get("imageLinks", {}).get("thumbnail", "").replace("zoom=1", "zoom=0").replace("http://", "https://")
+                img = v.get("imageLinks", {}).get("thumbnail", "").replace("zoom=1", "zoom=0")
+                if img:
+                     img = img.replace("http://", "https://")
                 results.append({
                     "title": v.get("title", "不明なタイトル"),
                     "authors": ", ".join(v.get("authors", ["不明な著者"])),
                     "thumbnail": img
                 })
-    except: pass
+        elif "error" in res:
+            st.error(f"APIエラー: {res['error'].get('message')}")
+    except Exception as e:
+        st.error(f"検索中にエラーが発生しました: {e}")
     return results
 
 @st.dialog("➕ 新しい本を登録", width="large")
