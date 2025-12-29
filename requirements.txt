@@ -1,7 +1,5 @@
-streamlit>=1.41.1
-pandas
-requests
-streamlit-gsheets-connection
-# Python 3.13での互換性を保つために必要なサブツール
-setuptools
-pyarrow
+streamlit>=1.41.0
+st-gsheets-connection
+pandas>=2.2.0
+pyarrow>=18.0.0
+# 上記はすべてPython 3.13に対応した最新バージョンを指定しています
