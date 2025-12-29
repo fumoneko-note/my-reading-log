@@ -1,4 +1,7 @@
-streamlit
+streamlit>=1.41.1
 pandas
 requests
-st-gsheets-connection
+streamlit-gsheets-connection
+# Python 3.13での互換性を保つために必要なサブツール
+setuptools
+pyarrow
