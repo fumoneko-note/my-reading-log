@@ -217,85 +217,91 @@ def get_search_results(query):
         st.error(f"検索中にエラーが発生しました: {e}")
     return results
 
-@st.dialog("➕ 新しい本を登録", width="large")
-def show_register_dialog():
+    # ダイアログではなく、メイン画面にexpanderで展開する方式に変更（動作安定化のため）
+    pass
+
+def render_registration_ui():
+    """メイン画面に表示する登録フォーム"""
     if 'new_book' not in st.session_state:
         st.session_state.new_book = {"title": "", "authors": "", "thumbnail": "", "url": ""}
     if 'search_results' not in st.session_state:
         st.session_state.search_results = []
     
-    # 検索エリアをフォームから出す（即時反映のため）
-    col_s1, col_s2 = st.columns([4, 1])
-    with col_s1:
-        # 入力後にEnterキーでも反応するように on_change は使わず、ボタン判定をメインにする
-        search_input_val = st.text_input("Amazon URL または 検索キーワード", value=st.session_state.new_book["url"], placeholder="URLまたはキーワードを入力", key="search_input_field")
-    with col_s2:
-        st.write(" ")
-        # フォームの外に出して、通常のボタンとして扱う
-        if st.button("検索 / 取得", use_container_width=True):
-             if search_input_val:
-                st.session_state.new_book["url"] = search_input_val
-                with st.spinner("候補を検索中..."):
-                    st.session_state.search_results = get_search_results(search_input_val)
-                st.rerun()
-    
-    # 検索候補の表示
-    if st.session_state.search_results:
-        st.markdown("### 🔍 候補から選択してください")
-        cols = st.columns(len(st.session_state.search_results))
-        for i, res in enumerate(st.session_state.search_results):
-            with cols[i]:
-                if res["thumbnail"]: st.image(res["thumbnail"], use_container_width=True)
-                else: st.write("[No Image]")
-                st.caption(f"**{res['title']}**")
-                if st.button("選択", key=f"pops_sel_{i}", use_container_width=True):
-                    st.session_state.new_book.update(res)
-                    st.session_state.search_results = [] 
-                    st.rerun()
-        st.divider()
-
-    with st.form("new_book_pop_form"):
-        st.markdown("#### 📖 書籍の詳細情報")
-        f_title = st.text_input("タイトル", value=st.session_state.new_book["title"])
-        f_author = st.text_input("著者", value=st.session_state.new_book["authors"])
-        f_img = st.text_input("画像URL", value=st.session_state.new_book["thumbnail"])
-        if f_img: st.image(f_img, width=100)
-        
-        c1, c2, c3 = st.columns(3)
-        with c1: f_cat = st.selectbox("カテゴリ", CATEGORY_LIST)
-        with c2: f_lang = st.selectbox("言語", LANGUAGE_LIST)
-        with c3: f_stat = st.selectbox("ステータス", STATUS_LIST)
-        
-        f_rate = st.select_slider("評価", options=["1", "2", "3", "4", "5"], value="3")
-        f_comment = st.text_area("コメント")
-        f_dates = st.date_input("読書期間", [datetime.date.today(), datetime.date.today()])
-        
-        st.write("---")
-        confirm = st.checkbox("上記の内容でデータベースに登録してよろしいですか？")
-        
-        if st.form_submit_button("💾 データベースに登録する", use_container_width=True):
-            if not f_title: st.error("タイトルは必須です")
-            elif not confirm: st.warning("登録を確認するチェックを入れてください")
-            else:
-                sd = f_dates[0].strftime("%Y-%m-%d") if len(f_dates) > 0 else ""
-                ed = f_dates[1].strftime("%Y-%m-%d") if len(f_dates) > 1 else sd
-                record = {"タイトル": f_title, "著者": f_author, "評価": f_rate, "カテゴリ": f_cat, "言語": f_lang, "ステータス": f_stat, "コメント": f_comment, "開始日": sd, "読了日": ed, "画像URL": f_img}
-                # グローバルなdf_booksに連結
-                updated_df_all = pd.concat([df_books, pd.DataFrame([record])], ignore_index=True)
-                if update_gsheet(updated_df_all):
-                    st.toast("📚 データベースに登録しました！")
-                    st.session_state.new_book = {"title": "", "authors": "", "thumbnail": "", "url": ""}
-                    st.session_state.search_results = []
-                    st.session_state.show_reg_dialog = False
-                    st.cache_data.clear()
-                    time.sleep(1) # トーストを見せるため少し待つ
+    with st.expander("➕ 新しい本を登録する", expanded=st.session_state.get('show_reg_ui', False)):
+        st.markdown("##### 1. 本を検索")
+        col_s1, col_s2 = st.columns([4, 1])
+        with col_s1:
+            search_input_val = st.text_input("Amazon URL または タイトル", value=st.session_state.new_book["url"], placeholder="例: 夏目漱石 こころ", key="search_input_main")
+        with col_s2:
+            st.write("")
+            if st.button("検索", use_container_width=True, key="search_btn_main"):
+                 if search_input_val:
+                    st.session_state.new_book["url"] = search_input_val # 入力値を保持
+                    with st.spinner("検索中..."):
+                        res = get_search_results(search_input_val)
+                        st.session_state.search_results = res
+                        if not res:
+                            st.warning("見つかりませんでした")
                     st.rerun()
 
-    if st.button("❌ 登録をキャンセル", use_container_width=True):
-        st.session_state.new_book = {"title": "", "authors": "", "thumbnail": "", "url": ""}
-        st.session_state.search_results = []
-        st.session_state.show_reg_dialog = False
-        st.rerun()
+        # 検索候補
+        if st.session_state.search_results:
+            st.markdown("##### 候補から選択:")
+            cols = st.columns(len(st.session_state.search_results))
+            for i, res in enumerate(st.session_state.search_results):
+                with cols[i]:
+                    if res["thumbnail"]: st.image(res["thumbnail"], use_container_width=True)
+                    else: st.write("No Image")
+                    # タイトルが長い場合は切り詰める
+                    short_title = res['title'][:15] + "..." if len(res['title']) > 15 else res['title']
+                    st.caption(f"{short_title}")
+                    
+                    if st.button("選択", key=f"sel_{i}", use_container_width=True):
+                        st.session_state.new_book.update(res)
+                        st.session_state.search_results = [] # 候補をクリア
+                        st.rerun()
+            st.divider()
+
+        st.markdown("##### 2. 詳細を入力して登録")
+        with st.form("new_book_main_form"):
+            f_title = st.text_input("タイトル (必須)", value=st.session_state.new_book["title"])
+            f_author = st.text_input("著者", value=st.session_state.new_book["authors"])
+            f_img = st.text_input("画像URL", value=st.session_state.new_book["thumbnail"])
+            
+            c1, c2, c3 = st.columns(3)
+            with c1: f_cat = st.selectbox("カテゴリ", CATEGORY_LIST)
+            with c2: f_lang = st.selectbox("言語", LANGUAGE_LIST)
+            with c3: f_stat = st.selectbox("ステータス", STATUS_LIST)
+            
+            f_rate = st.select_slider("評価", options=["1", "2", "3", "4", "5"], value="3")
+            f_comment = st.text_area("コメント", placeholder="感想などを入力")
+            f_dates = st.date_input("読書期間", [datetime.date.today(), datetime.date.today()])
+            
+            st.markdown("---")
+            if st.form_submit_button("保存する", type="primary", use_container_width=True):
+                if not f_title:
+                    st.error("タイトルは必須です")
+                else:
+                    sd = f_dates[0].strftime("%Y-%m-%d") if len(f_dates) > 0 else ""
+                    ed = f_dates[1].strftime("%Y-%m-%d") if len(f_dates) > 1 else sd
+                    # 既存のdf_booksを参照するためにglobal宣言は避け、引数かst.session_stateから取得する設計が望ましいが
+                    # 簡易対応としてst.connectionから再取得して追記する
+                    record = {"タイトル": f_title, "著者": f_author, "評価": f_rate, "カテゴリ": f_cat, "言語": f_lang, "ステータス": f_stat, "コメント": f_comment, "開始日": sd, "読了日": ed, "画像URL": f_img}
+                    
+                    # 読み書き用コネクション再取得
+                    conn_w = st.connection("gsheets", type=GSheetsConnection)
+                    current_df = conn_w.read()
+                    updated_df = pd.concat([current_df, pd.DataFrame([record])], ignore_index=True)
+                    try:
+                        conn_w.update(worksheet="Sheet1", data=updated_df)
+                        st.toast("登録しました！")
+                        # フォームリセット
+                        st.session_state.new_book = {"title": "", "authors": "", "thumbnail": "", "url": ""}
+                        st.session_state.show_reg_ui = False # 閉じる
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"保存エラー: {e}")
 
 @st.dialog("✏️ 本の情報を編集", width="large")
 def show_edit_dialog(index):
