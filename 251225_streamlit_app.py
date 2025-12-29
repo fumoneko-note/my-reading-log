@@ -222,6 +222,13 @@ else:
 # 2. 表示スタイルの切り替え
 display_mode = st.sidebar.radio("🖼️ 表示スタイル", ["本棚 (グリッド)", "リスト (一覧表)"])
 
+# 表示スタイルが変わったら詳細を閉じる
+if 'last_display_mode' not in st.session_state:
+    st.session_state.last_display_mode = display_mode
+if st.session_state.last_display_mode != display_mode:
+    st.session_state.active_detail_index = None
+    st.session_state.last_display_mode = display_mode
+
 st.sidebar.divider()
 
 # --- Google Sheets 接続 ---
@@ -302,6 +309,8 @@ def render_registration_ui():
         st.session_state.search_results = []
     
     with st.expander("➕ 新しい本を登録する", expanded=st.session_state.get('show_reg_ui', False)):
+        # 登録画面を開くときは詳細を閉じておく
+        st.session_state.active_detail_index = None
         st.markdown("##### 1. 本を検索")
         col_s1, col_s2 = st.columns([4, 1])
         with col_s1:
@@ -355,9 +364,13 @@ def render_registration_ui():
             f_dates = st.date_input("読書期間", [datetime.date.today(), datetime.date.today()])
             
             st.markdown("---")
+            confirm = st.checkbox("内容を確認しました（誤操作防止）", key="reg_confirm")
+            
             if st.form_submit_button("保存する", type="primary", use_container_width=True):
                 if not f_title:
                     st.error("タイトルは必須です")
+                elif not confirm:
+                    st.error("⚠️ 保存するにはチェックボックスを入れてください")
                 else:
                     sd = f_dates[0].strftime("%Y-%m-%d") if len(f_dates) > 0 else ""
                     ed = f_dates[1].strftime("%Y-%m-%d") if len(f_dates) > 1 else sd
@@ -640,15 +653,16 @@ if not df_books.empty:
             
             # コンテナを使って表示（ボタンとの整合性のため）
             with st.container():
-                # HTMLを表示
-                st.markdown(list_item_html, unsafe_allow_html=True)
-                # 詳細ボタン（右下に配置）
-                c_btn1, c_btn2 = st.columns([8, 1])
-                with c_btn2:
-                    if st.button("➕", key=f"lbtn_{idx}"):
-                        st.session_state.active_detail_index = idx
-                        st.rerun()
-        st.divider()
+                # カードとボタンを一つの枠に収めるような配置
+                inner_container = st.container(border=True)
+                with inner_container:
+                    # HTMLを表示
+                    st.markdown(list_item_html, unsafe_allow_html=True)
+                    # 詳細ボタン（右下に配置、カード感の一部として）
+                    c_btn1, c_btn2 = st.columns([8, 2])
+                    with c_btn2:
+                        st.button("詳細・編集 ➕", key=f"lbtn_{idx}", on_click=lambda i=idx: st.session_state.update({"active_detail_index": i}), use_container_width=True)
+            st.write("") # スペース確保
 
 # 新規登録UIは上部で既に表示済み（render_registration_ui）
 
