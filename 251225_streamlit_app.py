@@ -617,30 +617,26 @@ if not df_books.empty:
                 stars = ""
 
             # HTMLの構築
-            list_item_html = f"""
-            <div class="notion-list-item">
-                <img src="{img}" class="notion-cover">
-                <div class="notion-content">
-                    <div class="notion-title">{title}</div>
-                    <div class="notion-author">{author}</div>
-                    <div class="notion-rating">{stars}</div>
-                    <div class="notion-meta-row">
-                        <span class="notion-tag">{cat}</span>
-                        <span class="notion-tag">{lang}</span>
-                        <span class="notion-tag">{stat}</span>
-                    </div>
-            """
+            list_item_html = f"""<div class="notion-list-item">
+<img src="{img}" class="notion-cover">
+<div class="notion-content">
+<div class="notion-title">{title}</div>
+<div class="notion-author">{author}</div>
+<div class="notion-rating">{stars}</div>
+<div class="notion-meta-row">
+<span class="notion-tag">{cat}</span>
+<span class="notion-tag">{lang}</span>
+<span class="notion-tag">{stat}</span>
+</div>"""
             
             if comm:
                 # コメントは60文字で切り詰め
                 short_comm = comm[:60] + ("..." if len(comm) > 60 else "")
                 list_item_html += f'<div class="notion-comment">{short_comm}</div>'
             
-            list_item_html += f"""
-                    <div class="notion-footer">📅 {date_val}</div>
-                </div>
-            </div>
-            """
+            list_item_html += f"""<div class="notion-footer">📅 {date_val}</div>
+</div>
+</div>"""
             
             # コンテナを使って表示（ボタンとの整合性のため）
             with st.container():
