@@ -114,6 +114,80 @@ h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
 [data-testid="stSidebar"] hr {
     margin: 0.5rem 0 !important;
 }
+/* --- Notion風リストのCSS --- */
+.notion-list-item {
+    display: flex;
+    align-items: flex-start;
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease;
+    border: 1px solid #edf2f7;
+}
+.notion-list-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.notion-cover {
+    width: 80px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+.notion-content {
+    flex-grow: 1;
+    min-width: 0; /* 折り返しを正常にするため */
+}
+.notion-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+    line-height: 1.3;
+}
+.notion-author {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+.notion-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.notion-tag {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #475569;
+}
+.notion-rating {
+    color: #f59e0b;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.notion-comment {
+    font-size: 0.85rem;
+    color: #475569;
+    line-height: 1.4;
+    border-left: 3px solid #e2e8f0;
+    padding-left: 8px;
+    margin-top: 5px;
+}
+.notion-footer {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 8px;
+    text-align: right;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -515,7 +589,7 @@ if not df_books.empty:
             if col_idx % 7 == 0 and month_label == current_month:
                 cols = st.columns(7)
     else:
-        # 改良版リスト表示（年月区切り付き）
+        # 改良版リスト表示（Notion風カード形式）
         current_month = None
         for idx, row in df_f.iterrows():
             month_label = row['読了日_dt'].strftime('%Y年 %m月') if pd.notnull(row['読了日_dt']) else "日付なし"
@@ -523,34 +597,62 @@ if not df_books.empty:
                 current_month = month_label
                 st.markdown(f"#### 🗓️ {current_month}")
 
+            # 表示データの準備
+            img = row["画像URL"]
+            if not (isinstance(img, str) and img != "" and str(img) != 'nan'):
+                img = "https://via.placeholder.com/80x110?text=No+Cover" # ダミー画像
+            
+            title = row['タイトル']
+            author = row['著者'] if str(row['著者']) != 'nan' else '不明な著者'
+            cat = row['カテゴリ']
+            lang = row.get('言語', '日本語') if str(row.get('言語', '')) != 'nan' else '日本語'
+            stat = row.get('ステータス', '読了') if str(row.get('ステータス', '')) != 'nan' else '読了'
+            comm = str(row['コメント']) if str(row['コメント']) != 'nan' else ""
+            date_val = row['読了日']
+            
+            try:
+                r_val = int(float(row['評価'])) if str(row['評価']) != 'nan' else 0
+                stars = '★' * r_val + '☆' * (5 - r_val)
+            except:
+                stars = ""
+
+            # HTMLの構築
+            list_item_html = f"""
+            <div class="notion-list-item">
+                <img src="{img}" class="notion-cover">
+                <div class="notion-content">
+                    <div class="notion-title">{title}</div>
+                    <div class="notion-author">{author}</div>
+                    <div class="notion-rating">{stars}</div>
+                    <div class="notion-meta-row">
+                        <span class="notion-tag">{cat}</span>
+                        <span class="notion-tag">{lang}</span>
+                        <span class="notion-tag">{stat}</span>
+                    </div>
+            """
+            
+            if comm:
+                # コメントは60文字で切り詰め
+                short_comm = comm[:60] + ("..." if len(comm) > 60 else "")
+                list_item_html += f'<div class="notion-comment">{short_comm}</div>'
+            
+            list_item_html += f"""
+                    <div class="notion-footer">📅 {date_val}</div>
+                </div>
+            </div>
+            """
+            
+            # コンテナを使って表示（ボタンとの整合性のため）
             with st.container():
-                c1, c2, c3, c4, c5 = st.columns([0.6, 4, 1.5, 3, 1])
-                with c1:
-                    img = row["画像URL"]
-                    if isinstance(img, str) and img != "" and str(img) != 'nan':
-                        st.image(img, width=50)
-                    else: st.write("📕")
-                with c2:
-                    st.markdown(f"<div style='font-size:1rem; font-weight:600;'>{row['タイトル']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='font-size:0.85rem; color:#64748b;'>{row['著者']}</div>", unsafe_allow_html=True)
-                with c3:
-                    try:
-                        r_val = int(float(row['評価'])) if str(row['評価']) != 'nan' else 0
-                        st.markdown(f"<div style='color:#f59e0b; font-size:1rem;'>{'★' * r_val}{'☆' * (5 - r_val)}</div>", unsafe_allow_html=True)
-                    except: pass
-                    lang = row.get('言語', '日本語') if str(row.get('言語', '')) != 'nan' else '日本語'
-                    stat = row.get('ステータス', '読了') if str(row.get('ステータス', '')) != 'nan' else '読了'
-                    st.markdown(f"<div style='font-size:0.8rem; color:#94a3b8;'>{row['カテゴリ']} | {lang} | {stat}</div>", unsafe_allow_html=True)
-                with c4:
-                    comm = str(row['コメント']) if str(row['コメント']) != 'nan' else ""
-                    if comm:
-                        st.markdown(f"<div style='font-size:0.85rem; color:#475569; font-style:italic;'>\"{comm[:60]}{'...' if len(comm) > 60 else ''}\"</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='font-size:0.8rem; color:#94a3b8;'>📅 {row['読了日']}</div>", unsafe_allow_html=True)
-                with c5:
+                # HTMLを表示
+                st.markdown(list_item_html, unsafe_allow_html=True)
+                # 詳細ボタン（右下に配置）
+                c_btn1, c_btn2 = st.columns([8, 1])
+                with c_btn2:
                     if st.button("➕", key=f"lbtn_{idx}"):
                         st.session_state.active_detail_index = idx
                         st.rerun()
-            st.divider()
+        st.divider()
 
 # 新規登録UIは上部で既に表示済み（render_registration_ui）
 
