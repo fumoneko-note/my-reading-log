@@ -224,18 +224,20 @@ def show_register_dialog():
     if 'search_results' not in st.session_state:
         st.session_state.search_results = []
     
-    with st.form("search_form_pop"):
-        col_s1, col_s2 = st.columns([4, 1])
-        with col_s1:
-            search_input = st.text_input("Amazon URL または 検索キーワード", value=st.session_state.new_book["url"], placeholder="URLまたはキーワードでEnter")
-        with col_s2:
-            st.write(" ")
-            if st.form_submit_button("検索 / 取得", use_container_width=True):
-                if search_input:
-                    with st.spinner("候補を検索中..."):
-                        st.session_state.search_results = get_search_results(search_input)
-                        st.session_state.new_book["url"] = search_input
-                        st.rerun()
+    # 検索エリアをフォームから出す（即時反映のため）
+    col_s1, col_s2 = st.columns([4, 1])
+    with col_s1:
+        # 入力後にEnterキーでも反応するように on_change は使わず、ボタン判定をメインにする
+        search_input_val = st.text_input("Amazon URL または 検索キーワード", value=st.session_state.new_book["url"], placeholder="URLまたはキーワードを入力", key="search_input_field")
+    with col_s2:
+        st.write(" ")
+        # フォームの外に出して、通常のボタンとして扱う
+        if st.button("検索 / 取得", use_container_width=True):
+             if search_input_val:
+                st.session_state.new_book["url"] = search_input_val
+                with st.spinner("候補を検索中..."):
+                    st.session_state.search_results = get_search_results(search_input_val)
+                st.rerun()
     
     # 検索候補の表示
     if st.session_state.search_results:
