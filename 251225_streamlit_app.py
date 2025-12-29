@@ -220,13 +220,21 @@ else:
     st.sidebar.markdown("---")
 
 # 2. 表示スタイルの切り替え
-display_mode = st.sidebar.radio("🖼️ 表示スタイル", ["本棚 (グリッド)", "リスト (一覧表)"])
+# 名称変更: 本棚->PC向け, リスト->スマホ向け
+display_mode_raw = st.sidebar.radio("🖼️ 表示スタイル", ["PC向け", "スマホ向け"])
+display_mode = "本棚 (グリッド)" if display_mode_raw == "PC向け" else "リスト (一覧表)"
 
-# 表示スタイルが変わったら詳細を閉じる
+# 表示スタイルやフィルタを触ったら詳細を閉じるためのコールバック
+def clear_all_states():
+    st.session_state.active_detail_index = None
+    st.session_state.edit_index = None
+
+# サイドバーの全要素にclear_all_statesを適用したいが、
+# 表示切替時はここですぐにクリア
 if 'last_display_mode' not in st.session_state:
     st.session_state.last_display_mode = display_mode
 if st.session_state.last_display_mode != display_mode:
-    st.session_state.active_detail_index = None
+    clear_all_states()
     st.session_state.last_display_mode = display_mode
 
 st.sidebar.divider()
@@ -543,16 +551,17 @@ if not df_books.empty:
         key=f"{reset_prefix}status_group"
     )
 
-    q = st.sidebar.text_input("キーワード検索", key=f"{reset_prefix}search")
-    f_cat = st.sidebar.selectbox("カテゴリ", ["すべて"] + CATEGORY_LIST, key=f"{reset_prefix}cat")
-    f_lang = st.sidebar.selectbox("言語", ["すべて"] + LANGUAGE_LIST, key=f"{reset_prefix}lang")
+    q = st.sidebar.text_input("キーワード検索", key=f"{reset_prefix}search", on_change=clear_all_states)
+    f_cat = st.sidebar.selectbox("カテゴリ", ["すべて"] + CATEGORY_LIST, key=f"{reset_prefix}cat", on_change=clear_all_states)
+    f_lang = st.sidebar.selectbox("言語", ["すべて"] + LANGUAGE_LIST, key=f"{reset_prefix}lang", on_change=clear_all_states)
     
     years = ["すべて"] + sorted(df_books['読了日_dt'].dt.year.dropna().unique().astype(int).astype(str).tolist(), reverse=True)
-    f_year = st.sidebar.selectbox("読了年", years, key=f"{reset_prefix}year")
-    sort_order = st.sidebar.selectbox("並び替え", ["新しい順", "古い順"], key=f"{reset_prefix}sort")
+    f_year = st.sidebar.selectbox("読了年", years, key=f"{reset_prefix}year", on_change=clear_all_states)
+    sort_order = st.sidebar.selectbox("並び替え", ["新しい順", "古い順"], key=f"{reset_prefix}sort", on_change=clear_all_states)
     
     if st.sidebar.button("🧹 フィルタをクリア"):
         st.session_state.filter_reset_key += 1
+        clear_all_states()
         st.rerun()
     
     # フィルタ条件の適用
@@ -653,16 +662,18 @@ if not df_books.empty:
             
             # コンテナを使って表示（ボタンとの整合性のため）
             with st.container():
-                # カードとボタンを一つの枠に収めるような配置
+                # カードとボタンを一つの枠に収める
                 inner_container = st.container(border=True)
                 with inner_container:
                     # HTMLを表示
                     st.markdown(list_item_html, unsafe_allow_html=True)
-                    # 詳細ボタン（右下に配置、カード感の一部として）
-                    c_btn1, c_btn2 = st.columns([8, 2])
+                    # 詳細ボタン（右下に「＋」のみ配置）
+                    c_btn1, c_btn2 = st.columns([8, 1])
                     with c_btn2:
-                        st.button("詳細・編集 ➕", key=f"lbtn_{idx}", on_click=lambda i=idx: st.session_state.update({"active_detail_index": i}), use_container_width=True)
-            st.write("") # スペース確保
+                        if st.button("➕", key=f"lbtn_{idx}", use_container_width=True):
+                            st.session_state.active_detail_index = idx
+                            st.rerun()
+            st.write("") 
 
 # 新規登録UIは上部で既に表示済み（render_registration_ui）
 
