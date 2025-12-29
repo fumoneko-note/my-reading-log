@@ -430,13 +430,9 @@ def show_detail_dialog(row, index):
 # --- メイン画面 ---
 st.title("📚 読書記録")
 
-# ログイン中のみ「新規登録」トリガーを表示
+# ログイン中のみ「新規登録」UIを表示
 if st.session_state.authenticated:
-    if st.button("➕ 新しい本を登録する", use_container_width=True):
-        st.session_state.show_reg_dialog = True
-        st.rerun()
-
-st.divider()
+    render_registration_ui()
 
 st.divider()
 
@@ -539,9 +535,7 @@ if not df_books.empty:
                         st.rerun()
             st.divider()
 
-# 新規登録ダイアログの起動
-if 'show_reg_dialog' in st.session_state and st.session_state.show_reg_dialog:
-    show_register_dialog()
+# 新規登録UIは上部で既に表示済み（render_registration_ui）
 
 # 詳細ダイアログの起動
 if st.session_state.active_detail_index is not None:
