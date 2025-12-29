@@ -235,14 +235,19 @@ def render_registration_ui():
         with col_s2:
             st.write("")
             if st.button("検索", use_container_width=True, key="search_btn_main"):
-                 if search_input_val:
-                    st.session_state.new_book["url"] = search_input_val # 入力値を保持
+                st.write("🔍 検索ボタンが押されました")  # デバッグ用
+                if search_input_val:
+                    st.session_state.new_book["url"] = search_input_val
+                    st.write(f"検索キーワード: {search_input_val}")  # デバッグ用
                     with st.spinner("検索中..."):
                         res = get_search_results(search_input_val)
+                        st.write(f"検索結果: {len(res)}件")  # デバッグ用
                         st.session_state.search_results = res
                         if not res:
                             st.warning("見つかりませんでした")
                     st.rerun()
+                else:
+                    st.warning("検索キーワードを入力してください")  # デバッグ用
 
         # 検索候補
         if st.session_state.search_results:
