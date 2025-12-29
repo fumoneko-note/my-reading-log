@@ -139,16 +139,10 @@ else:
         unsafe_allow_html=True
     )
     
-    col_act1, col_act2 = st.sidebar.columns([3, 2])
-    with col_act1:
-        if st.button("➕ 新規登録", use_container_width=True):
-            st.session_state.show_reg_dialog = True
-            st.rerun()
-    with col_act2:
-        if st.button("ログアウト", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.edit_index = None
-            st.rerun()
+    if st.sidebar.button("ログアウト", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.edit_index = None
+        st.rerun()
     st.sidebar.markdown("---")
 
 # 2. 表示スタイルの切り替え
@@ -454,11 +448,17 @@ if not df_books.empty:
     # --- フィルタ (サイドバー) ---
     st.sidebar.title("🔍 検索・フィルタ")
     reset_prefix = f"filter_{st.session_state.filter_reset_key}_"
+    
+    # ステータスグループの切り替え
+    status_group = st.sidebar.radio(
+        "📚 表示切替",
+        ["読了", "読みたい・読書中"],
+        key=f"{reset_prefix}status_group"
+    )
 
     q = st.sidebar.text_input("キーワード検索", key=f"{reset_prefix}search")
     f_cat = st.sidebar.selectbox("カテゴリ", ["すべて"] + CATEGORY_LIST, key=f"{reset_prefix}cat")
     f_lang = st.sidebar.selectbox("言語", ["すべて"] + LANGUAGE_LIST, key=f"{reset_prefix}lang")
-    f_stat = st.sidebar.selectbox("ステータス", ["すべて"] + STATUS_LIST, key=f"{reset_prefix}status")
     
     years = ["すべて"] + sorted(df_books['読了日_dt'].dt.year.dropna().unique().astype(int).astype(str).tolist(), reverse=True)
     f_year = st.sidebar.selectbox("読了年", years, key=f"{reset_prefix}year")
@@ -470,11 +470,17 @@ if not df_books.empty:
     
     # フィルタ条件の適用
     df_f = df_books.copy()
+    
+    # ステータスグループによるフィルタ
+    if status_group == "読了":
+        df_f = df_f[df_f['ステータス'] == '読了']
+    else:  # 「読みたい・読書中」
+        df_f = df_f[df_f['ステータス'].isin(['読みたい', '読書中'])]
+    
     if q:
         df_f = df_f[df_f['タイトル'].str.contains(q, case=False, na=False) | df_f['著者'].str.contains(q, case=False, na=False)]
     if f_cat != "すべて": df_f = df_f[df_f['カテゴリ'] == f_cat]
     if f_lang != "すべて": df_f = df_f[df_f['言語'] == f_lang] if '言語' in df_f.columns else df_f
-    if f_stat != "すべて": df_f = df_f[df_f['ステータス'] == f_stat]
     if f_year != "すべて": df_f = df_f[df_f['読了日_dt'].dt.year == int(f_year)]
     
     is_asc = (sort_order == "古い順")
