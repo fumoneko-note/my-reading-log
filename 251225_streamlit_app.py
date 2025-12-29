@@ -194,14 +194,20 @@ def get_search_results(query):
             search_q = " ".join([w for w in raw_words if w.lower() not in ["novel", "english", "ebook", "kindle", "edition", "paperback", "hardcover"]])
 
     safe_q = urllib.parse.quote(search_q)
-    api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}"
+    # 地域制限を回避するため、country=JPパラメータを追加
+    api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}&country=JP&maxResults=5"
     results = []
     try:
-        # User-Agentを追加して拒否されにくくする
-        headers = {"User-Agent": "Mozilla/5.0"}
+        # より詳細なヘッダーを追加して、正規のブラウザからのアクセスに見せる
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+            "Referer": "https://www.google.com/"
+        }
         res = requests.get(api_url, headers=headers, timeout=10).json()
         if "items" in res:
-            for item in res["items"][:5]: # 上位5件
+            for item in res["items"]:
                 v = item.get("volumeInfo", {})
                 img = v.get("imageLinks", {}).get("thumbnail", "").replace("zoom=1", "zoom=0")
                 if img:
