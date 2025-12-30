@@ -243,8 +243,8 @@ def get_search_results(query):
             search_q = " ".join([w for w in raw_words if w.lower() not in ["novel", "english", "ebook", "kindle", "edition", "paperback", "hardcover"]])
 
     safe_q = urllib.parse.quote(search_q)
-    # 地域制限を回避するため、country=JPパラメータを追加
-    api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}&country=JP&maxResults=5"
+    # 検索精度向上のため、maxResultsを15に拡大
+    api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}&country=JP&maxResults=15"
     results = []
     try:
         # より詳細なヘッダーを追加して、正規のブラウザからのアクセスに見せる
@@ -283,8 +283,6 @@ def render_registration_ui():
         st.session_state.search_results = []
     
     with st.expander("➕ 新しい本を登録する", expanded=st.session_state.get('show_reg_ui', False)):
-        # 登録画面を開くときは詳細を閉じておく
-        st.session_state.active_detail_index = None
         st.markdown("##### 1. 本を検索")
         col_s1, col_s2 = st.columns([4, 1])
         with col_s1:
@@ -304,22 +302,24 @@ def render_registration_ui():
                 else:
                     st.warning("検索キーワードを入力してください")
 
-        # 検索候補
+        # 検索候補 (3列構成で多くの候補を表示)
         if st.session_state.search_results:
             st.markdown("##### 候補から選択:")
-            cols = st.columns(len(st.session_state.search_results))
-            for i, res in enumerate(st.session_state.search_results):
-                with cols[i]:
-                    if res["thumbnail"]: st.image(res["thumbnail"], use_container_width=True)
-                    else: st.write("No Image")
-                    # タイトルが長い場合は切り詰める
-                    short_title = res['title'][:15] + "..." if len(res['title']) > 15 else res['title']
-                    st.caption(f"{short_title}")
-                    
-                    if st.button("選択", key=f"sel_{i}", use_container_width=True):
-                        st.session_state.new_book.update(res)
-                        st.session_state.search_results = [] # 候補をクリア
-                        st.rerun()
+            res_list = st.session_state.search_results
+            for i in range(0, len(res_list), 3):
+                cols = st.columns(3)
+                for j in range(3):
+                    if i + j < len(res_list):
+                        res = res_list[i + j]
+                        with cols[j]:
+                            if res["thumbnail"]: st.image(res["thumbnail"], use_container_width=True)
+                            else: st.write("No Image")
+                            short_title = res['title'][:15] + "..." if len(res['title']) > 15 else res['title']
+                            st.caption(f"{short_title}")
+                            if st.button("選択", key=f"sel_{i+j}", use_container_width=True):
+                                st.session_state.new_book.update(res)
+                                st.session_state.search_results = []
+                                st.rerun()
             st.divider()
 
         st.markdown("##### 2. 詳細を入力して登録")
