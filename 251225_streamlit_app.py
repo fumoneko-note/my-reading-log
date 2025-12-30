@@ -231,45 +231,59 @@ def update_gsheet(df_all):
 def get_search_results(query):
     # ASIN/ISBNの抽出（URLの場合）
     asin_match = re.search(r"/(?:dp|product|ASID|ASIN|ebook)/([A-Z0-9]{10,13})", query)
-    search_q = query
-    if asin_match:
-        search_q = asin_match.group(1)
-    else:
-        # URLからキーワードを抽出
-        slug_match = re.search(r"jp/([^/]+)/(?:dp|product|ebook|ASID|ASIN)", query)
-        if slug_match:
-            decoded = urllib.parse.unquote(slug_match.group(1))
-            raw_words = re.findall(r"[\wéàèùâêîôûëïü]+", decoded)
-            search_q = " ".join([w for w in raw_words if w.lower() not in ["novel", "english", "ebook", "kindle", "edition", "paperback", "hardcover"]])
+    asin_q = asin_match.group(1) if asin_match else None
+    
+    # URLからタイトルのヒント（スラグ）を抽出
+    keyword_q = None
+    slug_match = re.search(r"jp/([^/]+)/(?:dp|product|ebook|ASID|ASIN)", query)
+    if slug_match:
+        decoded = urllib.parse.unquote(slug_match.group(1))
+        # ハイフンやアンダースコアも区切りとして扱う
+        raw_words = re.findall(r"[\wéàèùâêîôûëïü]+", decoded.replace("-", " ").replace("_", " "))
+        keyword_q = " ".join([w for w in raw_words if w.lower() not in ["novel", "english", "ebook", "kindle", "edition", "paperback", "hardcover", "psychological", "thriller"]])
+    
+    # ASINがない場合は入力クエリそのものをキーワードとする
+    if not asin_q and not keyword_q:
+        keyword_q = query
 
-    safe_q = urllib.parse.quote(search_q)
-    # 検索精度向上のため、maxResultsを15に拡大
-    api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}&country=JP&maxResults=15"
     results = []
-    try:
-        # より詳細なヘッダーを追加して、正規のブラウザからのアクセスに見せる
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
-            "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-            "Referer": "https://www.google.com/"
-        }
-        res = requests.get(api_url, headers=headers, timeout=10).json()
-        if "items" in res:
-            for item in res["items"]:
-                v = item.get("volumeInfo", {})
-                img = v.get("imageLinks", {}).get("thumbnail", "").replace("zoom=1", "zoom=0")
-                if img:
-                     img = img.replace("http://", "https://")
-                results.append({
-                    "title": v.get("title", "不明なタイトル"),
-                    "authors": ", ".join(v.get("authors", ["不明な著者"])),
-                    "thumbnail": img
-                })
-        elif "error" in res:
-            st.error(f"APIエラー: {res['error'].get('message')}")
-    except Exception as e:
-        st.error(f"検索中にエラーが発生しました: {e}")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+        "Referer": "https://www.google.com/"
+    }
+
+    # 検索パターンの構築
+    search_queries = []
+    if asin_q: search_queries.append(asin_q)
+    if keyword_q: search_queries.append(keyword_q)
+
+    seen_titles = set()
+    for sq in search_queries:
+        safe_q = urllib.parse.quote(sq)
+        api_url = f"https://www.googleapis.com/books/v1/volumes?q={safe_q}&country=JP&maxResults=10"
+        try:
+            res = requests.get(api_url, headers=headers, timeout=10).json()
+            if "items" in res:
+                for item in res["items"]:
+                    v = item.get("volumeInfo", {})
+                    title = v.get("title", "不明なタイトル")
+                    # 重複排除
+                    if title in seen_titles: continue
+                    seen_titles.add(title)
+                    
+                    img = v.get("imageLinks", {}).get("thumbnail", "").replace("zoom=1", "zoom=0")
+                    if img:
+                        img = img.replace("http://", "https://")
+                    results.append({
+                        "title": title,
+                        "authors": ", ".join(v.get("authors", ["不明な著者"])),
+                        "thumbnail": img
+                    })
+        except Exception as e:
+            st.error(f"検索中にエラーが発生しました ({sq}): {e}")
+    
     return results
 
     # ダイアログではなく、メイン画面にexpanderで展開する方式に変更（動作安定化のため）
