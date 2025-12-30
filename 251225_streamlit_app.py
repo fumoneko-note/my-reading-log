@@ -9,7 +9,7 @@ import urllib.parse
 from streamlit_gsheets import GSheetsConnection
 
 # --- 設定 ---
-CATEGORY_LIST = ["小説", "AI", "Stoicism", "語学", "ノンフィクション", "エッセイ", "その他"]
+CATEGORY_LIST = ["小説", "Stoicism", "語学", "キャリア", "AI", "ビジネス", "ノンフィクション", "エッセイ", "その他"]
 LANGUAGE_LIST = ["日本語", "英語", "スペイン語"]
 STATUS_LIST = ["読了", "読書中", "読みたい", "断念"]
 
@@ -218,40 +218,6 @@ else:
         st.session_state.edit_index = None
         st.rerun()
     st.sidebar.markdown("---")
-
-# 2. 表示スタイルの切り替え
-# 名称変更: 本棚->PC向け, リスト->スマホ向け
-display_mode_raw = st.sidebar.radio("🖼️ 表示スタイル", ["PC向け", "スマホ向け"])
-display_mode = "本棚 (グリッド)" if display_mode_raw == "PC向け" else "リスト (一覧表)"
-
-# 表示スタイルやフィルタを触ったら詳細を閉じるためのコールバック
-def clear_all_states():
-    st.session_state.active_detail_index = None
-    st.session_state.edit_index = None
-
-# サイドバーの全要素にclear_all_statesを適用したいが、
-# 表示切替時はここですぐにクリア
-if 'last_display_mode' not in st.session_state:
-    st.session_state.last_display_mode = display_mode
-if st.session_state.last_display_mode != display_mode:
-    clear_all_states()
-    st.session_state.last_display_mode = display_mode
-
-st.sidebar.divider()
-
-# --- Google Sheets 接続 ---
-df_books = pd.DataFrame() # 初期化
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # TTLを短く設定(60秒)して、入力中のカクつきを抑える。一新したい場合はリフレッシュボタン
-    df_books = conn.read(ttl=60) 
-except Exception as e:
-    st.error(f"接続エラー: {e}")
-    st.stop()
-
-if st.sidebar.button("🔄 データを最新に更新"):
-    st.cache_data.clear()
-    st.rerun()
 
 # --- 関数 ---
 def update_gsheet(df_all):
@@ -536,33 +502,69 @@ if st.session_state.authenticated:
 
 st.divider()
 
-# --- 本棚表示 ---
+# --- Google Sheets 接続 ---
+df_books = pd.DataFrame() # 初期化
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df_books = conn.read(ttl=60) 
+except Exception as e:
+    st.error(f"接続エラー: {e}")
+    st.stop()
+
+# --- サイドバー (表示・フィルタ) ---
+def clear_all_states():
+    st.session_state.active_detail_index = None
+    st.session_state.edit_index = None
+
 if not df_books.empty:
     df_books['読了日_dt'] = pd.to_datetime(df_books['読了日'], errors='coerce')
     
-    # --- フィルタ (サイドバー) ---
-    st.sidebar.title("🔍 検索・フィルタ")
-    reset_prefix = f"filter_{st.session_state.filter_reset_key}_"
+    # --- フィルタと設定の順序整理 ---
+    # 1. フィルタをクリア (データ更新含む)
+    if st.sidebar.button("🧹 フィルタをクリア・更新", use_container_width=True):
+        st.session_state.filter_reset_key += 1
+        st.cache_data.clear()
+        clear_all_states()
+        st.rerun()
     
-    # ステータスグループの切り替え
+    st.sidebar.divider()
+    
+    # リセットキーを全フィルタに適用
+    reset_prefix = f"filter_{st.session_state.filter_reset_key}_"
+
+    # 2. 表示スタイル
+    display_mode_raw = st.sidebar.radio("🖼️ 表示スタイル", ["PC向け", "スマホ向け"], key=f"{reset_prefix}display_mode")
+    display_mode = "本棚 (グリッド)" if display_mode_raw == "PC向け" else "リスト (一覧表)"
+    
+    if 'last_display_mode' not in st.session_state:
+        st.session_state.last_display_mode = display_mode
+    if st.session_state.last_display_mode != display_mode:
+        clear_all_states()
+        st.session_state.last_display_mode = display_mode
+
+    # 3. 表示切替
     status_group = st.sidebar.radio(
         "📚 表示切替",
         ["読了", "読みたい・読書中"],
-        key=f"{reset_prefix}status_group"
+        key=f"{reset_prefix}status_group",
+        on_change=clear_all_states
     )
 
-    q = st.sidebar.text_input("キーワード検索", key=f"{reset_prefix}search", on_change=clear_all_states)
-    f_cat = st.sidebar.selectbox("カテゴリ", ["すべて"] + CATEGORY_LIST, key=f"{reset_prefix}cat", on_change=clear_all_states)
-    f_lang = st.sidebar.selectbox("言語", ["すべて"] + LANGUAGE_LIST, key=f"{reset_prefix}lang", on_change=clear_all_states)
-    
+    # 4. 読了年
     years = ["すべて"] + sorted(df_books['読了日_dt'].dt.year.dropna().unique().astype(int).astype(str).tolist(), reverse=True)
     f_year = st.sidebar.selectbox("読了年", years, key=f"{reset_prefix}year", on_change=clear_all_states)
+
+    # 5. 言語
+    f_lang = st.sidebar.selectbox("言語", ["すべて"] + LANGUAGE_LIST, key=f"{reset_prefix}lang", on_change=clear_all_states)
+
+    # 6. カテゴリ
+    f_cat = st.sidebar.selectbox("カテゴリ", ["すべて"] + CATEGORY_LIST, key=f"{reset_prefix}cat", on_change=clear_all_states)
+
+    # 7. キーワード検索
+    q = st.sidebar.text_input("キーワード検索", key=f"{reset_prefix}search", on_change=clear_all_states)
+
+    # 8. 並び替え
     sort_order = st.sidebar.selectbox("並び替え", ["新しい順", "古い順"], key=f"{reset_prefix}sort", on_change=clear_all_states)
-    
-    if st.sidebar.button("🧹 フィルタをクリア"):
-        st.session_state.filter_reset_key += 1
-        clear_all_states()
-        st.rerun()
     
     # フィルタ条件の適用
     df_f = df_books.copy()
