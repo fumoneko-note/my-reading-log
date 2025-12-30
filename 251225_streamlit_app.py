@@ -328,6 +328,10 @@ def render_registration_ui():
             f_author = st.text_input("著者", value=st.session_state.new_book["authors"])
             f_img = st.text_input("画像URL", value=st.session_state.new_book["thumbnail"])
             
+            # 画像プレビューの追加
+            if f_img and f_img.startswith("http"):
+                st.image(f_img, width=100, caption="プレビュー")
+            
             c1, c2, c3 = st.columns(3)
             with c1: f_cat = st.selectbox("カテゴリ", CATEGORY_LIST)
             with c2: f_lang = st.selectbox("言語", LANGUAGE_LIST)
@@ -676,6 +680,7 @@ if not df_books.empty:
                     # 詳細ボタン（右下に「＋」のみ配置）
                     c_btn1, c_btn2 = st.columns([8, 1])
                     with c_btn2:
+                        # 確実に詳細を開くために、ボタンが押されたらその場でインデックスをセットして即再表示する形式に変更
                         if st.button("➕", key=f"lbtn_{idx}", use_container_width=True):
                             st.session_state.active_detail_index = idx
                             st.rerun()
