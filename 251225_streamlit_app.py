@@ -520,8 +520,8 @@ if not df_books.empty:
     df_books['読了日_dt'] = pd.to_datetime(df_books['読了日'], errors='coerce')
     
     # --- フィルタと設定の順序整理 ---
-    # 1. フィルタをクリア (データ更新含む)
-    if st.sidebar.button("🧹 フィルタをクリア・更新", use_container_width=True):
+    # 1. ホーム (フィルタクリア & データ更新)
+    if st.sidebar.button("🏠 ホーム", use_container_width=True):
         st.session_state.filter_reset_key += 1
         st.cache_data.clear()
         clear_all_states()
@@ -542,6 +542,8 @@ if not df_books.empty:
         clear_all_states()
         st.session_state.last_display_mode = display_mode
 
+    st.sidebar.write("") # 余白調整
+
     # 3. 表示切替
     status_group = st.sidebar.radio(
         "📚 表示切替",
@@ -549,6 +551,8 @@ if not df_books.empty:
         key=f"{reset_prefix}status_group",
         on_change=clear_all_states
     )
+
+    st.sidebar.write("") # 余白調整
 
     # 4. 読了年
     years = ["すべて"] + sorted(df_books['読了日_dt'].dt.year.dropna().unique().astype(int).astype(str).tolist(), reverse=True)
